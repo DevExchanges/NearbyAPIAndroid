@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Google Play Services: Nearby API</string>
+    <string name="server_id">server_id</string>
+</resources>
