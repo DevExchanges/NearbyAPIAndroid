@@ -4,11 +4,11 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.TextInputLayout;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.WindowManager;
@@ -40,7 +40,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     private View btnConnect;
     private View btnSend;
     private ArrayAdapter<String> adapter;
-    private List<String> mRemotePeerEndpoints;
+    private List<String> remotePeerEndpoints;
     private boolean isConnected;
     private TextInputLayout textInputLayout;
     private View inputLayout;
@@ -55,7 +55,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mRemotePeerEndpoints = new ArrayList<>();
+        remotePeerEndpoints = new ArrayList<>();
 
         listView = (ListView) findViewById(R.id.list);
         btnConnect = findViewById(R.id.btn_connect);
@@ -74,7 +74,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
                 .addApi(Nearby.CONNECTIONS_API)
                 .build();
 
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, mRemotePeerEndpoints);
+        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, remotePeerEndpoints);
         listView.setAdapter(adapter);
     }
 
@@ -113,6 +113,21 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         return false;
     }
 
+    private void advertise() {
+        if (!isConnectedToNetwork()) return;
+
+        String name = "Nearby Advertising";
+        Nearby.Connections.startAdvertising(googleApiClient, name, null, CONNECTION_TIME_OUT, this)
+                .setResultCallback(new ResultCallback<Connections.StartAdvertisingResult>() {
+                    @Override
+                    public void onResult(Connections.StartAdvertisingResult result) {
+                        if (result.getStatus().isSuccess()) {
+                            status.setText("Advertising");
+                        }
+                    }
+                });
+    }
+
     private void disconnect() {
         if (!isConnectedToNetwork())
             return;
@@ -123,10 +138,10 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
             Nearby.Connections.stopAllEndpoints(googleApiClient);
             isHost = false;
             status.setText("Not connected");
-            mRemotePeerEndpoints.clear();
+            remotePeerEndpoints.clear();
         } else {
             if (!isConnected || TextUtils.isEmpty(mRemoteHostEndpoint)) {
-                Nearby.Connections.stopDiscovery(googleApiClient, getString(R.string.server_id));
+                Nearby.Connections.stopDiscovery(googleApiClient, getString(R.string.service_id));
                 return;
             }
 
@@ -139,42 +154,9 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         isConnected = false;
     }
 
-    private void advertise() {
-        if (!isConnectedToNetwork())
-            return;
-
-        String name = "Nearby Advertising";
-
-        Nearby.Connections.startAdvertising(googleApiClient, name, null, CONNECTION_TIME_OUT, this)
-                .setResultCallback(new ResultCallback<Connections.StartAdvertisingResult>() {
-            @Override
-            public void onResult(Connections.StartAdvertisingResult result) {
-                if (result.getStatus().isSuccess()) {
-                    status.setText("Advertising");
-                }
-            }
-        });
-    }
-
-    private void discover() {
-        if (!isConnectedToNetwork())
-            return;
-
-        String serviceId = getString(R.string.server_id);
-        Nearby.Connections.startDiscovery(googleApiClient, serviceId, CONNECTION_TIME_OUT, this)
-                .setResultCallback(new ResultCallback<Status>() {
-            @Override
-            public void onResult(Status status) {
-                if (status.isSuccess()) {
-                    MainActivity.this.status.setText("Discovering");
-                }
-            }
-        });
-    }
-
     private void sendMessage(String message) {
         if (isHost) {
-            Nearby.Connections.sendReliableMessage(googleApiClient, mRemotePeerEndpoints, message.getBytes());
+            Nearby.Connections.sendReliableMessage(googleApiClient, remotePeerEndpoints, message.getBytes());
             adapter.add(message);
             adapter.notifyDataSetChanged();
         } else {
@@ -192,8 +174,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
                         @Override
                         public void onResult(Status status) {
                             if (status.isSuccess()) {
-                                if (!mRemotePeerEndpoints.contains(remoteEndpointId)) {
-                                    mRemotePeerEndpoints.add(remoteEndpointId);
+                                if (!remotePeerEndpoints.contains(remoteEndpointId)) {
+                                    remotePeerEndpoints.add(remoteEndpointId);
                                 }
 
                                 getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -206,6 +188,22 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         } else {
             Nearby.Connections.rejectConnectionRequest(googleApiClient, remoteEndpointId);
         }
+    }
+
+    private void discover() {
+        if (!isConnectedToNetwork())
+            return;
+
+        String serviceId = getString(R.string.service_id);
+        Nearby.Connections.startDiscovery(googleApiClient, serviceId, CONNECTION_TIME_OUT, this)
+                .setResultCallback(new ResultCallback<Status>() {
+                    @Override
+                    public void onResult(Status status) {
+                        if (status.isSuccess()) {
+                            MainActivity.this.status.setText("Discovering");
+                        }
+                    }
+                });
     }
 
     @Override
@@ -279,7 +277,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
             }
             case R.id.btn_send: {
                 if (!TextUtils.isEmpty(textInputLayout.getEditText().getText()) && isConnected
-                        || (mRemotePeerEndpoints != null && !mRemotePeerEndpoints.isEmpty())) {
+                        || (remotePeerEndpoints != null && !remotePeerEndpoints.isEmpty())) {
                     sendMessage(textInputLayout.getEditText().getText().toString());
                     textInputLayout.getEditText().setText("");
                 }

@@ -21,7 +21,7 @@
 
         <meta-data
             android:name="com.google.android.gms.nearby.connection.SERVICE_ID"
-            android:value="@string/server_id" />
+            android:value="@string/service_id" />
     </application>
 
 </manifest>
